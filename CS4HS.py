@@ -681,46 +681,49 @@ def _addToCaches(moduleFilename):
 
 
 def _trace(frame, event, arg):
-    # If this is the first time we've seen this source file, cache it.
-    filename = frame.f_code.co_filename
-    if filename[0] == "<":
-        return
-    if filename not in _plainGotoCache:
-        _addToCaches(filename)
+    try:
+        # If this is the first time we've seen this source file, cache it.
+        filename = frame.f_code.co_filename
+        if filename[0] == "<":
+            return
+        if filename not in _plainGotoCache:
+            _addToCaches(filename)
 
-    # Is there a goto on this line?
-    targetLabel = _plainGotoCache[filename].get(frame.f_lineno)
-    if not targetLabel:
-        # No plain goto.  Is there a computed goto?
-        identifier = _computedGotoCache[filename].get(frame.f_lineno)
-        if identifier:
-            # If eval explodes, just let the exception propagate.
-            targetLabel = eval(identifier, frame.f_globals, frame.f_locals)
+        # Is there a goto on this line?
+        targetLabel = _plainGotoCache[filename].get(frame.f_lineno)
+        if not targetLabel:
+            # No plain goto.  Is there a computed goto?
+            identifier = _computedGotoCache[filename].get(frame.f_lineno)
+            if identifier:
+                # If eval explodes, just let the exception propagate.
+                targetLabel = eval(identifier, frame.f_globals, frame.f_locals)
 
-    # Jump to the label's line.
-    if targetLabel:
-        try:
-            targetLine = _labelNameCache[filename][targetLabel]
-        except KeyError:
-            raise (MissingLabelError, "Missing label: %s" % targetLabel)
-        frame.f_lineno = targetLine
+        # Jump to the label's line.
+        if targetLabel:
+            try:
+                targetLine = _labelNameCache[filename][targetLabel]
+            except KeyError:
+                raise (MissingLabelError, "Missing label: %s" % targetLabel)
+            frame.f_lineno = targetLine
 
-    # Is there a label on this line with a corresponding comefrom?
-    label = _labelCache[filename].get(frame.f_lineno)
-    if label:
-        targetComefromLine = _comefromNameCache[filename].get(label)
-        if targetComefromLine:
-            frame.f_lineno = targetComefromLine
+        # Is there a label on this line with a corresponding comefrom?
+        label = _labelCache[filename].get(frame.f_lineno)
+        if label:
+            targetComefromLine = _comefromNameCache[filename].get(label)
+            if targetComefromLine:
+                frame.f_lineno = targetComefromLine
+    except Exception as e:
+        return None
 
     return _trace
-'''
+
 # Install the trace function, including all preceding frames.
 sys.settrace(_trace)
 frame = sys._getframe().f_back
 while frame:
     frame.f_trace = _trace
     frame = frame.f_back
-'''
+
 # Define the so-called keywords for importing: 'goto', 'label' and 'comefrom'.
 class _Label:
     """Allows arbitrary x.y attribute lookups."""
